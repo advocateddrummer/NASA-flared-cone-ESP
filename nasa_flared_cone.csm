@@ -1,0 +1,67 @@
+# written by Ethan Alan Hereth
+# ehereth@utk.edu
+
+cfgpmtr revolveIt 1 # if 1, create 3D, rotated solid
+
+# Cone parameters
+despmtr angle 5.0 # Included angle of cone.
+despmtr len1 10.0 # Length of the front/straight section of cone.
+despmtr len2 10.0 # Length of the back/flared section of cone.
+despmtr baseDiameter 4.724 # Diameter of cone base.
+
+set m tand(angle) # Slope of cone.
+set yMid len1*m
+
+# Cone nose parameters
+despmtr noseRadius 0.01 # Cone nose radius
+
+# Math required to create the rounded nose such that the intersection between
+# the semi-circular nose section and straight cone section is tangent. I
+# derived this by hand and think it is correct.
+set noseXCent "sqrt((noseRadius^2*(m^2 + 1)^2)/(m^4 + m^2))"
+set noseX "noseXCent - noseRadius"
+set noseTanX "noseXCent/(m^2 + 1)"
+set noseTanY "(noseXCent - noseTanX)/m"
+set noseX2 "(noseXCent + noseX)/2.0"
+set noseY2 "sqrt(noseRadius^2 - (noseX2 - noseXCent)^2)"
+
+# Cone flare parameters
+despmtr flareRadius 93.071 # Flare radius
+
+# Math required to calculate the center of the flare circle that starts at the
+# end of the straight cone section, and ends at the trailing edge of the cone
+# (defined by (len1, yMid) and (len1 + len2, baseDiameter/2) respectively).
+# This also calculates a point on the circle between the two defined end points
+# which is required for the associated cirarc directive.
+set x1 len1
+set x2 "len1 + len2"
+set y1 yMid
+set y2 baseDiameter/2
+set dx "x2 - x1"
+set dy "y2 - y1"
+set c "x1*x1 - x2*x2 + y1*y1 - y2*y2"
+set e "1.0 + dy*dy/(dx*dx)"
+set d "x1 + c/(2.0*dx)"
+set f "2.0*dy*d/dx - 2.0*y1"
+set g "d*d + y1*y1 - flareRadius*flareRadius"
+set yFlareCent "(-f + sqrt(f*f - 4.0*e*g))/(2.0*e)"
+set xFlareCent "-dy*yFlareCent/dx - c/(2.0*dx)"
+set xFlareMid "(2*len1 + len2)/2.0"
+set yFlareMid "-sqrt(flareRadius^2 - (xFlareMid - xFlareCent)^2) + yFlareCent"
+
+# Create flared-cone profile.
+skbeg noseX 0.0 0.0
+  linseg len1 0.0 0.0
+  linseg len1+len2 0.0 0.0
+  linseg len1+len2 baseDiameter/2 0.0
+  cirarc xFlareMid yFlareMid 0.0 len1 yMid 0.0
+  linseg noseTanX noseTanY 0.0
+  cirarc noseX2 noseY2 0.0 noseX 0.0 0.0
+skend
+
+# Create 3D solid if requested.
+ifthen revolveIt eq 1
+  revolve 0 0 0 1 0 0 360
+endif
+
+#dump nasa_flared_cone.igs
